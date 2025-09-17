@@ -50,8 +50,27 @@ npm run build
 #### Documentation Accuracy
 - **Code Alignment**: All documented features must exist in current codebase
 - **Version Accuracy**: Version references must reflect actual release timeline
+- **Date Accuracy**: Never assume or guess dates/times - always use `date` command for accurate timestamps
 - **No Hyperbole**: Avoid "works with all systems", "fully tested", "production ready"
 - **Verified Claims**: "Designed to work with D&D 5e, PF2e, Dragonbane" (tested systems only)
+
+##### Date and Time Handling (CRITICAL)
+
+**Always use the `date` command** for accurate timestamps in:
+- Commit messages and changelogs
+- Documentation updates
+- Release notes and status reports
+- Any content requiring current date/time
+
+**Required Commands**:
+```bash
+date                                                # Full current date/time
+date "+%Y-%m-%d"                                   # ISO format (2024-03-15)
+date "+%B %d, %Y"                                  # Long format (March 15, 2024)
+TZ=America/New_York date "+%Y-%m-%d %H:%M:%S %Z"   # Full timestamp with EDT/EST timezone
+```
+
+**Prohibited**: Never use placeholder dates, assume dates from context, or guess timestamps.
 
 #### Testing Standards (MOSTLY ENFORCED)
 - **Core Business Logic**: 90%+ test coverage required

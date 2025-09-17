@@ -52,6 +52,26 @@ docs/
 - **Version Accuracy**: Version references must reflect actual release timeline
 - **Citation Validation**: All external references must be current and accessible
 - **Installation Verification**: Setup instructions must be tested in clean environment
+- **Date Accuracy**: Never assume or guess dates/times - always use `date` command for accurate timestamps
+
+#### Date and Time Handling (CRITICAL)
+
+**Always use the `date` command** to get accurate timestamps when needed for:
+- Documentation updates and file timestamps
+- Commit messages and changelog entries
+- Status reports and release notes
+- Any content requiring current date/time
+
+**Required Commands**:
+- `date` - Full current date/time
+- `date "+%Y-%m-%d"` - ISO format (e.g., 2024-03-15)
+- `date "+%B %d, %Y"` - Long format (e.g., March 15, 2024)
+- `TZ=America/New_York date "+%Y-%m-%d %H:%M:%S %Z"` - Full timestamp with EDT/EST timezone
+
+**Prohibited Practices**:
+- Never use placeholder dates like "January 6, 2025"
+- Never assume dates from context or previous content
+- Never guess or estimate timestamps for any documentation
 
 ### Language Standards
 
