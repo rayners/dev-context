@@ -52,7 +52,7 @@
 - **League of Extraordinary FoundryVTT Developers**: Discord community
 
 ### Data Lifecycle Guides
-- **From Load to Render (FoundryVTT Community Wiki)**: Step-by-step walkthrough of how a document's data travels from the world database through `Game.getData`, document constructors, the DataModel lifecycle, embedded document preparation, and finally Application V1/V2 sheet rendering hooks.
+- **From Load to Render**: https://foundryvtt.wiki/en/development/guides/from-load-to-render - Step-by-step walkthrough of how a document's data travels from the world database through `Game.getData`, document constructors, the DataModel lifecycle, embedded document preparation, and finally Application V1/V2 sheet rendering hooks.
 
 ## TypeScript and Foundry Types
 
