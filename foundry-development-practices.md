@@ -169,6 +169,12 @@ TZ=America/New_York date "+%Y-%m-%d %H:%M:%S %Z"   # Full timestamp with EDT/EST
 - **Asset Management**: Proper handling of templates, styles, and static assets
 - **Canvas Integration**: Use proper layer architecture for visual elements
 
+### Document Lifecycle Checkpoints
+- **Reference**: [From Load to Render — FoundryVTT Community Wiki](https://foundryvtt.wiki/en/development/guides/from-load-to-render)
+- **Server to Client**: `Game.getData()` hydrates world collections, and document constructors run DataModel `_initializeSource` and `_initialize` to migrate, clean, and validate source data before populating live instances.
+- **Preparation Pipeline**: `ClientDocument#prepareData` defers to `prepareBaseData`, `prepareEmbeddedDocuments`, and `prepareDerivedData`—use these hooks for default state setup, active effect aggregation, and computed values instead of mutating data during sheet rendering.
+- **Sheet Rendering**: DocumentSheet (App V1) and DocumentSheetV2 rely on `getData`, `_prepareContext`, and `_preparePartContext` to build template context; keep display-only logic here and continue to route business rules through the earlier lifecycle stages.
+
 ### Known Gotchas
 - **Actor Type Namespacing**: Use full namespaced types (`'journeys-and-jamborees.party'`)
 - **Foundry Object Updates**: Use deletion syntax with `-=` prefix for removing object keys
