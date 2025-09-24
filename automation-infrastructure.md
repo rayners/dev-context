@@ -434,7 +434,8 @@ export default defineConfig({
 - **Major**: Breaking changes and API redesigns
 
 ### Automated Changelog
-- **Conventional Commits**: feat:, fix:, docs:, style:, refactor:, test:, chore:
+- **Conventional Commits**: feat:, fix:, docs:, style:, refactor:, test:, chore:, ci:
+- **CI/CD Commits**: All changes solely within `.github/` directory should use `ci:` prefix
 - **Release Please**: Automatic version bumping and changelog generation
 - **GitHub Integration**: Automatic release creation and asset upload
 
