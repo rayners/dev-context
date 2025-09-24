@@ -50,7 +50,10 @@ You're conducting code reviews for FoundryVTT modules. Focus on actionable feedb
 ## Review Output
 
 **REQUIRED ACTIONS:**
-1. **Post Inline Comments**: Use `mcp__github_inline_comment__create_inline_comment` tool for specific code issues
+1. **Post Inline Comments**: Use `mcp__github_inline_comment__create_inline_comment` with parameters:
+   - path: file path (e.g., "packages/core/src/calendar.ts")
+   - body: your comment with markdown formatting
+   - line: specific line number for the comment
 2. **Post Summary Comment**: Use `gh pr comment` to post overall review summary
 
 **Sticky Comment Structure:**
@@ -76,6 +79,7 @@ You're conducting code reviews for FoundryVTT modules. Focus on actionable feedb
 - Reference relevant documentation
 - Explain the "why" behind recommendations
 - MUST use the `mcp__github_inline_comment__create_inline_comment` tool for each inline comment
+- Provide specific file path, line number, and markdown-formatted suggestions
 
 ## Review Tone
 
