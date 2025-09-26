@@ -355,6 +355,369 @@ export class SheetExtensions {
 }
 ```
 
+### ApplicationV2 Architecture Pattern
+
+ApplicationV2 is FoundryVTT's modern UI framework introduced in V12 that will eventually replace the legacy Application class. It provides a component-based architecture with better lifecycle events and improved accessibility.
+
+**References**:
+- https://foundryvtt.wiki/en/development/api/applicationv2
+- https://foundryvtt.com/api/v13/classes/foundry.applications.api.ApplicationV2.html
+- https://foundryvtt.com/api/v13/classes/foundry.applications.api.DocumentSheetV2.html
+
+#### Key ApplicationV2 Improvements over V1
+- **Native light/dark mode support**
+- **Better application window frames**
+- **Architecture supports non-Handlebars rendering engines** much more easily
+- **Support for partial re-rendering** with the PARTS system
+- **Better lifecycle events** and improved a11y handling
+- **Overall simpler and cleaner** to implement
+- **No jQuery by default** - uses native DOM manipulation (jQuery still available if preferred)
+
+#### Which Class to Extend
+
+Unlike Application V1, ApplicationV2 requires a rendering mixin. For most use cases:
+
+```typescript
+// Use HandlebarsApplicationMixin for Handlebars templates
+const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
+
+export class MyApplication extends HandlebarsApplicationMixin(ApplicationV2) {
+  static DEFAULT_OPTIONS = {
+    tag: "div", // or "form" for form applications
+    window: {
+      title: "My Application",
+      icon: "fas fa-calendar"
+    },
+    position: {
+      width: 400,
+      height: 300
+    },
+    actions: {
+      myAction: MyApplication.myAction
+    }
+  };
+
+  static PARTS = {
+    content: {
+      template: "modules/my-module/templates/content.hbs"
+    }
+  };
+
+  async _prepareContext(options) {
+    return {
+      title: "My Application",
+      // Include any data needed by templates
+    };
+  }
+
+  _onRender(context, options) {
+    // Add non-click event listeners here
+    // Click events should use the actions system instead
+  }
+
+  static myAction(event, target) {
+    console.log(this); // Points to the application instance
+  }
+}
+```
+
+#### The PARTS System (HandlebarsApplicationMixin)
+
+The PARTS system enables **modular UI composition** with independent template rendering and partial re-rendering capabilities.
+
+##### HandlebarsTemplatePart Structure
+```typescript
+/**
+ * @typedef {Object} HandlebarsTemplatePart
+ * @property {string} template                      The template entry-point for the part
+ * @property {string} [id]                          A CSS id to assign to the top-level element
+ *                                                  (automatically prefixed by application id)
+ * @property {string[]} [classes]                   CSS classes for the top-level element
+ * @property {string[]} [templates]                 Additional templates required for the part
+ * @property {string[]} [scrollable]                Selectors whose scroll positions should persist
+ *                                                  during re-render (empty string = root level)
+ * @property {Record<string, ApplicationFormConfiguration>} [forms]  Form selectors and handlers
+ */
+```
+
+##### Multi-Part Application Example
+```typescript
+const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
+
+export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV2) {
+  static PARTS = {
+    // Simple part - just a template
+    header: {
+      template: "modules/seasons-stars/templates/calendar-header.hbs"
+    },
+
+    // Part with scrollable content
+    calendar: {
+      template: "modules/seasons-stars/templates/calendar-grid.hbs",
+      scrollable: [""], // Root level scrollable
+      classes: ["calendar-main"]
+    },
+
+    // Part with additional templates and scrollable areas
+    events: {
+      template: "modules/seasons-stars/templates/event-list.hbs",
+      templates: [
+        "modules/seasons-stars/templates/partials/event-item.hbs"
+      ],
+      scrollable: ["ul.event-list"],
+      id: "event-container"
+    }
+  };
+
+  async _prepareContext(options) {
+    // Shared context for all parts
+    return {
+      currentUser: game.user,
+      isGM: game.user.isGM,
+      // Add shared data here
+    };
+  }
+
+  async _preparePartContext(partId, context) {
+    // Add partId to context (done by default)
+    context.partId = `${this.id}-${partId}`;
+
+    // Part-specific context preparation
+    switch (partId) {
+      case "calendar":
+        return {
+          ...context,
+          days: await this.getCalendarDays(),
+          currentMonth: this.getCurrentMonth()
+        };
+
+      case "events":
+        return {
+          ...context,
+          events: await this.getEvents(),
+          categories: this.getEventCategories()
+        };
+
+      default:
+        return context;
+    }
+  }
+}
+```
+
+##### Key PARTS System Benefits
+
+**1. Partial Re-rendering**
+```typescript
+// Update only specific parts instead of the entire application
+async updateCalendarGrid() {
+  await this.render({ parts: ["calendar"] });
+}
+
+// Update multiple specific parts
+async updateTimeAndEvents() {
+  await this.render({ parts: ["header", "events"] });
+}
+
+// Conditional part rendering based on data
+_configureRenderOptions(options) {
+  super._configureRenderOptions(options);
+
+  // Only show advanced parts if user has permission
+  options.parts = ["header", "main"];
+  if (game.user.isGM) {
+    options.parts.push("gm-controls");
+  }
+
+  // Conditionally show tabs based on document type
+  if (this.document?.type === "complex") {
+    options.parts.push("advanced-tab");
+  }
+}
+```
+
+**2. Template Organization and Reuse**
+- Each part can reference additional templates via the `templates` array
+- Templates are automatically loaded before first render
+- Supports both main templates and reusable partials
+- Parts are concatenated in the order defined in the `PARTS` object
+
+```typescript
+static PARTS = {
+  // Part with additional template dependencies
+  inventory: {
+    template: "modules/my-module/templates/inventory.hbs",
+    templates: [
+      "modules/my-module/templates/partials/item-card.hbs",
+      "modules/my-module/templates/partials/item-controls.hbs"
+    ]
+  }
+};
+```
+
+#### Form Handling in ApplicationV2
+
+ApplicationV2 has built-in form handling. Set `tag: "form"` and configure the form handler:
+
+```typescript
+export class MyFormApp extends HandlebarsApplicationMixin(ApplicationV2) {
+  static DEFAULT_OPTIONS = {
+    tag: "form", // Essential for form functionality
+    form: {
+      handler: MyFormApp.myFormHandler,
+      submitOnChange: false,
+      closeOnSubmit: false
+    }
+  };
+
+  /**
+   * Process form submission for the sheet
+   * @this {MyFormApp}                        The handler is called with the application as its bound scope
+   * @param {SubmitEvent} event                The originating form submission event
+   * @param {HTMLFormElement} form             The form element that was submitted
+   * @param {FormDataExtended} formData        Processed data for the submitted form
+   * @returns {Promise<void>}
+   */
+  static async myFormHandler(event, form, formData) {
+    console.log("Form submitted:", formData.object);
+    // Process the form data here
+  }
+}
+```
+
+#### Actions System (Click Event Handling)
+
+The actions system replaces `activateListeners` from Application V1:
+
+```typescript
+static DEFAULT_OPTIONS = {
+  actions: {
+    deleteItem: MyApp.deleteItem,
+    editItem: MyApp.editItem,
+    rollDice: MyApp.rollDice
+  }
+};
+
+// Action handlers are static but have access to `this` (the app instance)
+static deleteItem(event, target) {
+  const itemId = target.dataset.itemId;
+  console.log(this); // Points to the application instance
+  // Handle deletion
+}
+
+static editItem(event, target) {
+  // Handle editing
+}
+```
+
+Use in templates with `data-action` attributes:
+```handlebars
+<button type="button" data-action="deleteItem" data-item-id="{{item.id}}">
+  Delete Item
+</button>
+```
+
+#### ApplicationV2 Lifecycle Methods
+
+Key lifecycle methods for customization:
+
+```typescript
+export class MyApp extends HandlebarsApplicationMixin(ApplicationV2) {
+  // Called once before first render - load templates here
+  async _preFirstRender(context, options) {
+    await super._preFirstRender(context, options);
+    // Additional one-time setup
+  }
+
+  // Configure which parts to render
+  _configureRenderOptions(options) {
+    super._configureRenderOptions(options);
+    // Modify options.parts array here
+  }
+
+  // Prepare shared context for all parts
+  async _prepareContext(options) {
+    return {
+      // Data shared across all parts
+    };
+  }
+
+  // Prepare context specific to each part
+  async _preparePartContext(partId, context) {
+    context.partId = `${this.id}-${partId}`;
+    // Add part-specific data
+    return context;
+  }
+
+  // Called after rendering (replaces activateListeners)
+  _onRender(context, options) {
+    // Add non-click event listeners
+    // Click events should use the actions system
+  }
+}
+```
+
+#### Document Sheets (DocumentSheetV2)
+
+For document sheets, extend `DocumentSheetV2` instead:
+
+```typescript
+const { DocumentSheetV2, HandlebarsApplicationMixin } = foundry.applications.api;
+
+export class MyActorSheet extends HandlebarsApplicationMixin(DocumentSheetV2) {
+  static DEFAULT_OPTIONS = {
+    classes: ["my-actor-sheet"],
+    position: { width: 600, height: 700 },
+    actions: {
+      rollSkill: MyActorSheet.rollSkill
+    }
+  };
+
+  static PARTS = {
+    header: { template: "modules/my-module/templates/actor-header.hbs" },
+    tabs: { template: "templates/generic/tab-navigation.hbs" },
+    attributes: { template: "modules/my-module/templates/actor-attributes.hbs" },
+    skills: { template: "modules/my-module/templates/actor-skills.hbs" }
+  };
+
+  // DocumentSheetV2 provides document context automatically
+  async _prepareContext(options) {
+    const context = await super._prepareContext(options);
+
+    // Add custom data
+    context.enrichedBiography = await TextEditor.enrichHTML(
+      this.document.system.biography,
+      { secrets: this.document.isOwner }
+    );
+
+    return context;
+  }
+
+  static async rollSkill(event, target) {
+    const skillId = target.dataset.skillId;
+    // Handle skill roll
+  }
+}
+
+// Register the sheet
+Hooks.once("init", () => {
+  DocumentSheetConfig.registerSheet(Actor, "my-module", MyActorSheet, {
+    label: "My Actor Sheet",
+    types: ["character", "npc"],
+    makeDefault: true
+  });
+});
+```
+
+#### Best Practices for ApplicationV2 Development
+
+1. **Use HandlebarsApplicationMixin** unless you need a different rendering engine
+2. **Leverage PARTS for modularity** - each part should have a clear purpose
+3. **Use actions for click events** instead of manual event listeners
+4. **Prepare context efficiently** - only compute what each part needs
+5. **Take advantage of partial rendering** with `render({ parts: [...] })`
+6. **Follow the lifecycle** - use appropriate methods for setup and teardown
+
 ## Data Storage Patterns
 
 ### Settings Management
