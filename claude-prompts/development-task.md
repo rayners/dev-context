@@ -75,7 +75,7 @@ Follow these steps for all development tasks:
 - Use git commands via the Bash tool for version control:
   - Stage files: Bash(git add <files>)
   - Commit changes: Bash(git commit -m "<message>")
-  - Push to remote: Bash(git push origin <branch>) (NEVER force push)
+  - Push to remote: Bash(git push -u origin HEAD) (works for both new and existing branches, NEVER force push)
   - Check status: Bash(git status)
   - View diff: Bash(git diff)
 - Smart branch handling:
