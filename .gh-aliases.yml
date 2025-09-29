@@ -1,0 +1,248 @@
+disc-categories: |
+  !f() {
+    if [ $# -lt 2 ]; then
+      echo "Usage: gh disc-categories <owner> <repo>" >&2
+      return 1
+    fi
+    gh api graphql \
+      -f owner="$1" \
+      -f name="$2" \
+      -f query='query($owner: String!, $name: String!) {
+        repository(owner: $owner, name: $name) {
+          discussionCategories(first: 100) {
+            nodes {
+              id
+              name
+              description
+              isAnswerable
+            }
+          }
+        }
+      }' \
+      --jq '.data.repository.discussionCategories.nodes'
+  }; f "$@"
+
+disc-category-discussions: |
+  !f() {
+    if [ $# -lt 3 ]; then
+      echo "Usage: gh disc-category-discussions <owner> <repo> <categoryId> [answered|unanswered|true|false|any]" >&2
+      return 1
+    fi
+
+    owner="$1"
+    repo="$2"
+    category_id="$3"
+    answered_arg="${4:-}"
+
+    case "$answered_arg" in
+      ''|any)
+        answered_flag=""
+        ;;
+      answered|true)
+        answered_flag="true"
+        ;;
+      unanswered|false)
+        answered_flag="false"
+        ;;
+      *)
+        echo "Optional answered argument must be answered, unanswered, true, false, or any" >&2
+        return 1
+        ;;
+    esac
+
+    args=(graphql -f owner="$owner" -f name="$repo" -f categoryId="$category_id" -f query='query($owner: String!, $name: String!, $categoryId: ID!, $answered: Boolean) {
+      repository(owner: $owner, name: $name) {
+        discussions(first: 50, orderBy: { field: CREATED_AT, direction: DESC }, categoryId: $categoryId, answered: $answered) {
+          nodes {
+            id
+            number
+            title
+            url
+            createdAt
+            answerChosenAt
+            isAnswered
+            closed
+            author {
+              login
+            }
+          }
+        }
+      }
+    }')
+
+    if [ -n "$answered_flag" ]; then
+      args+=(-f answered="$answered_flag")
+    fi
+
+    gh api "${args[@]}" --jq '.data.repository.discussions.nodes | map(. + { state: (if .closed then "CLOSED" else "OPEN" end) })'
+  }; f "$@"
+
+disc-comments: |
+  !f() {
+    if [ $# -lt 3 ]; then
+      echo "Usage: gh disc-comments <owner> <repo> <discussionNumber|discussionId>" >&2
+      return 1
+    fi
+
+    owner="$1"
+    repo="$2"
+    ref="$3"
+
+    jq_filter=$'def norm($c):\n  $c + {replies: ($c.replies.nodes // []), isDiscussion: false}\n  | del(.replies);\ndef root($d):\n  {\n    id: $d.id,\n    url: $d.url,\n    createdAt: $d.createdAt,\n    updatedAt: $d.updatedAt,\n    replyTo: null,\n    author: $d.author,\n    body: $d.body,\n    isAnswer: false,\n    isDiscussion: true,\n    replies: []\n  };\ndef build($d):\n  {\n    discussion: {\n      id: $d.id,\n      number: $d.number,\n      title: $d.title,\n      url: $d.url,\n      commentCount: $d.comments.totalCount\n    },\n    comments: ([root($d)] + ($d.comments.nodes // [] | map(norm(.))))\n  };\nif .data.repository?.discussion then\n  build(.data.repository.discussion)\nelif (.data.node // {} | .__typename == "Discussion") then\n  build(.data.node)\nelse\n  {discussion: null, comments: []}\nend'
+
+    case "$ref" in
+      ('')
+        echo "Discussion reference may not be empty" >&2
+        return 1
+        ;;
+      (*[!0-9]*)
+        gh api graphql \
+          -f id="$ref" \
+          -f query='query($id: ID!) {
+            node(id: $id) {
+              __typename
+              ... on Discussion {
+                id
+                number
+                title
+                url
+                createdAt
+                updatedAt
+                author {
+                  login
+                }
+                body
+                comments(first: 100) {
+                  totalCount
+                  nodes {
+                    id
+                    url
+                    createdAt
+                    updatedAt
+                    isAnswer
+                    replyTo { id }
+                    author { login }
+                    body
+                    replies(first: 100) {
+                      nodes {
+                        id
+                        url
+                        createdAt
+                        updatedAt
+                        replyTo { id }
+                        author { login }
+                        body
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }' \
+          --jq "$jq_filter"
+        ;;
+      (*)
+        gh api graphql \
+          -f owner="$owner" \
+          -f name="$repo" \
+          -F number=$ref \
+          -f query='query($owner: String!, $name: String!, $number: Int!) {
+            repository(owner: $owner, name: $name) {
+              discussion(number: $number) {
+                id
+                number
+                title
+                url
+                createdAt
+                updatedAt
+                author {
+                  login
+                }
+                body
+                comments(first: 100) {
+                  totalCount
+                  nodes {
+                    id
+                    url
+                    createdAt
+                    updatedAt
+                    isAnswer
+                    replyTo { id }
+                    author { login }
+                    body
+                    replies(first: 100) {
+                      nodes {
+                        id
+                        url
+                        createdAt
+                        updatedAt
+                        replyTo { id }
+                        author { login }
+                        body
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }' \
+          --jq "$jq_filter"
+        ;;
+    esac
+  }; f "$@"
+
+disc-reply: |
+  !f() {
+    if [ $# -lt 4 ]; then
+      echo "Usage: gh disc-reply <owner> <repo> <discussionNumber|discussionId> <replyToCommentId> <body>" >&2
+      return 1
+    fi
+
+    owner="$1"
+    repo="$2"
+    discussion_ref="$3"
+    reply_to="$4"
+    shift 4
+
+    body="$*"
+    if [ -z "$body" ]; then
+      echo "Reply body must be provided as the remaining arguments." >&2
+      return 1
+    fi
+
+    case "$discussion_ref" in
+      (*[!0-9]*)
+        discussion_id="$discussion_ref"
+        ;;
+      (*)
+        discussion_id=$(gh api graphql -f owner="$owner" -f name="$repo" -F number=$discussion_ref -f query='query($owner: String!, $name: String!, $number: Int!) {
+          repository(owner: $owner, name: $name) {
+            discussion(number: $number) {
+              id
+            }
+          }
+        }' --jq '.data.repository.discussion.id')
+        ;;
+    esac
+
+    if [ -z "$discussion_id" ] || [ "$discussion_id" = "null" ]; then
+      echo "Unable to resolve discussion id" >&2
+      return 1
+    fi
+
+    gh api graphql \
+      -f discussionId="$discussion_id" \
+      -f replyToId="$reply_to" \
+      -f body="$body" \
+      -f query='mutation($discussionId: ID!, $replyToId: ID!, $body: String!) {
+        addDiscussionComment(input: { discussionId: $discussionId, replyToId: $replyToId, body: $body }) {
+          comment {
+            id
+            url
+            createdAt
+            body
+          }
+        }
+      }' \
+      --jq '.data.addDiscussionComment.comment'
+  }; f "$@"
