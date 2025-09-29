@@ -87,7 +87,7 @@ disc-comments: |
     gh api graphql \
       -f owner="$1" \
       -f name="$2" \
-      -f number="$3" \
+      -F number=$3 \
       -f query='query($owner: String!, $name: String!, $number: Int!) {
         repository(owner: $owner, name: $name) {
           discussion(number: $number) {
@@ -134,7 +134,7 @@ disc-reply: |
       return 1
     fi
 
-    discussion_id=$(gh api graphql -f owner="$owner" -f name="$repo" -f number="$number" -f query='query($owner: String!, $name: String!, $number: Int!) {
+    discussion_id=$(gh api graphql -f owner="$owner" -f name="$repo" -F number=$number -f query='query($owner: String!, $name: String!, $number: Int!) {
       repository(owner: $owner, name: $name) {
         discussion(number: $number) {
           id
