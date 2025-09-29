@@ -20,7 +20,7 @@ disc-categories: |
         }
       }' \
       --jq '.data.repository.discussionCategories.nodes'
-  }; f
+  }; f "$@"
 
 disc-category-discussions: |
   !f() {
@@ -75,7 +75,7 @@ disc-category-discussions: |
     fi
 
     gh api "${args[@]}" --jq '.data.repository.discussions.nodes | map(. + { state: (if .closed then "CLOSED" else "OPEN" end) })'
-  }; f
+  }; f "$@"
 
 disc-comments: |
   !f() {
@@ -113,7 +113,7 @@ disc-comments: |
         }
       }' \
       --jq '.data.repository.discussion.comments.nodes'
-  }; f
+  }; f "$@"
 
 disc-reply: |
   !f() {
@@ -162,4 +162,4 @@ disc-reply: |
         }
       }' \
       --jq '.data.addDiscussionComment.comment'
-  }; f
+  }; f "$@"
