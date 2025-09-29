@@ -319,8 +319,9 @@ async function handleList(options, token) {
             title
             createdAt
             url
-            state
             answerChosenAt
+            isAnswered
+            closed
             category { id name }
             author { login }
           }
@@ -346,7 +347,10 @@ async function handleList(options, token) {
 
   const data = await requestGraphQL(token, query, variables);
 
-  const nodes = data?.repository?.discussions?.nodes ?? [];
+  const nodes = (data?.repository?.discussions?.nodes ?? []).map((node) => ({
+    ...node,
+    state: node.closed ? 'CLOSED' : 'OPEN',
+  }));
   output(nodes, options.format);
 }
 
