@@ -88,7 +88,7 @@ disc-comments: |
     repo="$2"
     ref="$3"
 
-    jq_filter=$'def norm($c):\n  $c + {replies: ($c.replies.nodes // [])}\n  | del(.replies);\ndef build($d):\n  {\n    discussion: {\n      id: $d.id,\n      number: $d.number,\n      title: $d.title,\n      url: $d.url,\n      commentCount: $d.comments.totalCount\n    },\n    comments: ($d.comments.nodes // [] | map(norm(.)))\n  };\nif .data.repository?.discussion then\n  build(.data.repository.discussion)\nelif (.data.node // {} | .__typename == "Discussion") then\n  build(.data.node)\nelse\n  {discussion: null, comments: []}\nend'
+    jq_filter=$'def norm($c):\n  $c + {replies: ($c.replies.nodes // []), isDiscussion: false}\n  | del(.replies);\ndef root($d):\n  {\n    id: $d.id,\n    url: $d.url,\n    createdAt: $d.createdAt,\n    updatedAt: $d.updatedAt,\n    replyTo: null,\n    author: $d.author,\n    body: $d.body,\n    isAnswer: false,\n    isDiscussion: true,\n    replies: []\n  };\ndef build($d):\n  {\n    discussion: {\n      id: $d.id,\n      number: $d.number,\n      title: $d.title,\n      url: $d.url,\n      commentCount: $d.comments.totalCount\n    },\n    comments: ([root($d)] + ($d.comments.nodes // [] | map(norm(.))))\n  };\nif .data.repository?.discussion then\n  build(.data.repository.discussion)\nelif (.data.node // {} | .__typename == "Discussion") then\n  build(.data.node)\nelse\n  {discussion: null, comments: []}\nend'
 
     case "$ref" in
       ('')
@@ -106,6 +106,12 @@ disc-comments: |
                 number
                 title
                 url
+                createdAt
+                updatedAt
+                author {
+                  login
+                }
+                body
                 comments(first: 100) {
                   totalCount
                   nodes {
@@ -147,6 +153,12 @@ disc-comments: |
                 number
                 title
                 url
+                createdAt
+                updatedAt
+                author {
+                  login
+                }
+                body
                 comments(first: 100) {
                   totalCount
                   nodes {

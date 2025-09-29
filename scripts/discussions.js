@@ -563,6 +563,12 @@ async function handleListComments(options, token) {
       number
       title
       url
+      createdAt
+      updatedAt
+      author {
+        login
+      }
+      body
       comments(first: 100, after: $after) {
         totalCount
         nodes {
@@ -609,6 +615,12 @@ async function handleListComments(options, token) {
       number
       title
       url
+      createdAt
+      updatedAt
+      author {
+        login
+      }
+      body
       comments(first: 100, after: $after) {
         totalCount
         nodes {
@@ -641,6 +653,7 @@ async function handleListComments(options, token) {
   `;
 
   const comments = [];
+  let rootComment = null;
   let after = null;
   let hasNextPage = true;
   let discussionSummary = null;
@@ -678,10 +691,23 @@ async function handleListComments(options, token) {
         url: discussion.url,
         commentCount: discussion.comments?.totalCount ?? null,
       };
+      rootComment = {
+        id: discussion.id,
+        url: discussion.url,
+        createdAt: discussion.createdAt,
+        updatedAt: discussion.updatedAt ?? null,
+        replyTo: null,
+        author: discussion.author ?? null,
+        body: discussion.body ?? null,
+        isAnswer: false,
+        isDiscussion: true,
+        replies: [],
+      };
     }
 
     const batch = (discussion.comments?.nodes ?? []).map((comment) => ({
       ...comment,
+      isDiscussion: false,
       replies: comment.replies?.nodes ?? [],
     }));
     comments.push(...batch);
@@ -705,7 +731,7 @@ async function handleListComments(options, token) {
   output(
     {
       discussion: discussionSummary,
-      comments,
+      comments: rootComment ? [rootComment, ...comments] : comments,
     },
     options.format,
   );
