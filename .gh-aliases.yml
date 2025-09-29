@@ -25,56 +25,68 @@ disc-categories: |
 disc-category-discussions: |
   !f() {
     if [ $# -lt 3 ]; then
-      echo "Usage: gh disc-category-discussions <owner> <repo> <categoryId> [answered|unanswered|true|false|any]" >&2
+      echo "Usage: gh disc-category-discussions <owner> <repo> <categoryId> [answered|unanswered|replied|unreplied|any]" >&2
       return 1
     fi
 
     owner="$1"
     repo="$2"
     category_id="$3"
-    answered_arg="${4:-}"
+    filter_arg="${4:-}"
 
-    case "$answered_arg" in
-      ''|any)
-        answered_flag=""
-        ;;
+    # Build the jq filter based on the argument
+    base_filter='.data.repository.discussions.nodes | map(. + { state: (if .closed then "CLOSED" else "OPEN" end), commentCount: .comments.totalCount, hasReplies: (.comments.totalCount > 0) }) | map(del(.comments))'
+
+    case "$filter_arg" in
       answered|true)
-        answered_flag="true"
+        jq_filter="$base_filter | map(select(.isAnswered == true))"
         ;;
       unanswered|false)
-        answered_flag="false"
+        jq_filter="$base_filter | map(select(.isAnswered == false))"
+        ;;
+      replied)
+        jq_filter="$base_filter | map(select(.hasReplies == true))"
+        ;;
+      unreplied)
+        jq_filter="$base_filter | map(select(.hasReplies == false))"
+        ;;
+      ''|any)
+        jq_filter="$base_filter"
         ;;
       *)
-        echo "Optional answered argument must be answered, unanswered, true, false, or any" >&2
+        echo "Optional filter argument must be answered, unanswered, replied, unreplied, true, false, or any" >&2
         return 1
         ;;
     esac
 
-    args=(graphql -f owner="$owner" -f name="$repo" -f categoryId="$category_id" -f query='query($owner: String!, $name: String!, $categoryId: ID!, $answered: Boolean) {
-      repository(owner: $owner, name: $name) {
-        discussions(first: 50, orderBy: { field: CREATED_AT, direction: DESC }, categoryId: $categoryId, answered: $answered) {
-          nodes {
-            id
-            number
-            title
-            url
-            createdAt
-            answerChosenAt
-            isAnswered
-            closed
-            author {
-              login
+    # Always fetch all discussions with comment counts, then filter client-side
+    gh api graphql \
+      -f owner="$owner" \
+      -f name="$repo" \
+      -f categoryId="$category_id" \
+      -f query='query($owner: String!, $name: String!, $categoryId: ID!) {
+        repository(owner: $owner, name: $name) {
+          discussions(first: 50, orderBy: { field: CREATED_AT, direction: DESC }, categoryId: $categoryId) {
+            nodes {
+              id
+              number
+              title
+              url
+              createdAt
+              answerChosenAt
+              isAnswered
+              closed
+              author {
+                login
+              }
+              comments {
+                totalCount
+              }
             }
           }
         }
-      }
-    }')
-
-    if [ -n "$answered_flag" ]; then
-      args+=(-f answered="$answered_flag")
-    fi
-
-    gh api "${args[@]}" --jq '.data.repository.discussions.nodes | map(. + { state: (if .closed then "CLOSED" else "OPEN" end) })'
+      }' \
+      --jq "$jq_filter"
   }; f "$@"
 
 disc-comments: |
