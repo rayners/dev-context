@@ -19,6 +19,7 @@ const FLAG_NAMES = new Set([
   '--reply-to',
   '--answered',
   '--state',
+  '--discussion-id',
   '--format',
   '--help',
 ]);
@@ -36,8 +37,8 @@ function printHelp() {
   stdout.write(`  --list-categories       List discussion categories with GraphQL IDs.\n`);
   stdout.write(`  --get <number>          Fetch a discussion via the REST API.\n`);
   stdout.write(`  --create                Create a discussion using the GraphQL API. Requires --title, --body, --category-id.\n`);
-  stdout.write(`  --list-comments <num>   List comments for a discussion using the GraphQL API.\n`);
-  stdout.write(`  --comment <number>      Add a comment or reply via the GraphQL API. Requires --body.\n\n`);
+  stdout.write(`  --list-comments [ref]   List comments for a discussion (number or node ID).\n`);
+  stdout.write(`  --comment <ref>         Add a comment or reply (number or node ID). Requires --body.\n\n`);
   stdout.write(`Additional options:\n`);
   stdout.write(`  --title <text>          Title for --create.\n`);
   stdout.write(`  --body <text>           Markdown body for --create or --comment.\n`);
@@ -45,6 +46,7 @@ function printHelp() {
   stdout.write(`  --answered <state>      Filter --list results: answered, unanswered, true, false, or any (default).\n`);
   stdout.write(`  --state <state>         Filter --list results by state (open or closed). May be repeated.\n`);
   stdout.write(`  --reply-to <id>         Reply to an existing comment (use with --comment).\n`);
+  stdout.write(`  --discussion-id <id>    Explicit discussion node ID (useful with --list-comments or --comment).\n`);
   stdout.write(`  --format <type>         Output format: json (default) or text.\n`);
   stdout.write(`  --help                  Show this message.\n\n`);
   stdout.write(`Examples:\n`);
@@ -75,6 +77,17 @@ function parseInteger(value, flag) {
     throw new Error(`${flag} requires an integer value`);
   }
   return parsed;
+}
+
+function assignDiscussionReference(options, value, flag) {
+  if (/^\d+$/.test(value)) {
+    const parsed = parseInteger(value, flag);
+    options.number = parsed;
+  } else if (value) {
+    options.discussionId = value;
+  } else {
+    throw new Error(`${flag} requires a discussion number or node ID`);
+  }
 }
 
 function parseArgs(list) {
@@ -117,13 +130,18 @@ function parseArgs(list) {
         break;
       case '--comment':
         opts.action = ensureSingleAction(opts.action, 'comment');
-        opts.number = parseInteger(takeValue(list, i, '--comment'), '--comment');
+        assignDiscussionReference(opts, takeValue(list, i, '--comment'), '--comment');
         i += 1;
         break;
       case '--list-comments':
         opts.action = ensureSingleAction(opts.action, 'listComments');
-        opts.number = parseInteger(takeValue(list, i, '--list-comments'), '--list-comments');
-        i += 1;
+        {
+          const next = list[i + 1];
+          if (next && !FLAG_NAMES.has(next)) {
+            assignDiscussionReference(opts, next, '--list-comments');
+            i += 1;
+          }
+        }
         break;
       case '--title':
         opts.title = takeValue(list, i, '--title');
@@ -139,6 +157,10 @@ function parseArgs(list) {
         break;
       case '--reply-to':
         opts.replyToId = takeValue(list, i, '--reply-to');
+        i += 1;
+        break;
+      case '--discussion-id':
+        opts.discussionId = takeValue(list, i, '--discussion-id');
         i += 1;
         break;
       case '--answered': {
@@ -439,8 +461,8 @@ async function handleCreate(options, token) {
 }
 
 async function handleComment(options, token) {
-  if (!Number.isFinite(options.number)) {
-    throw new Error('--comment requires a discussion number');
+  if (!Number.isFinite(options.number) && !options.discussionId) {
+    throw new Error('--comment requires a discussion number or --discussion-id');
   }
   if (!options.body) {
     throw new Error('--comment requires --body');
@@ -495,6 +517,12 @@ async function getRepositoryId(options, token) {
 }
 
 async function getDiscussionId(options, token) {
+  if (options.discussionId) {
+    return options.discussionId;
+  }
+  if (!Number.isFinite(options.number)) {
+    throw new Error('Unable to resolve discussion ID. Provide a valid discussion number or --discussion-id.');
+  }
   const query = `
     query($owner: String!, $name: String!, $number: Int!) {
       repository(owner: $owner, name: $name) {
@@ -511,40 +539,102 @@ async function getDiscussionId(options, token) {
   });
   const discussionId = data?.repository?.discussion?.id;
   if (!discussionId) {
-    throw new Error('Unable to resolve discussion ID. Check the discussion number.');
+    throw new Error('Unable to resolve discussion ID. Check the discussion reference.');
   }
   return discussionId;
 }
 
 async function handleListComments(options, token) {
-  if (!Number.isFinite(options.number)) {
-    throw new Error('--list-comments requires a discussion number');
+  if (!Number.isFinite(options.number) && !options.discussionId) {
+    throw new Error('--list-comments requires a discussion number, node ID, or --discussion-id');
   }
 
-  const query = `
+  const queryByNumber = `
     query($owner: String!, $name: String!, $number: Int!, $after: String) {
       repository(owner: $owner, name: $name) {
         discussion(number: $number) {
+          ...DiscussionForComments
+        }
+      }
+    }
+
+    fragment DiscussionForComments on Discussion {
+      id
+      number
+      title
+      url
+      comments(first: 100, after: $after) {
+        totalCount
+        nodes {
           id
-          number
-          title
           url
-          comments(first: 100, after: $after) {
+          createdAt
+          updatedAt
+          isAnswer
+          replyTo { id }
+          author { login }
+          body
+          replies(first: 100) {
             nodes {
               id
               url
               createdAt
               updatedAt
-              isAnswer
               replyTo { id }
               author { login }
               body
             }
-            pageInfo {
-              hasNextPage
-              endCursor
+          }
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
+    }
+  `;
+
+  const queryById = `
+    query($id: ID!, $after: String) {
+      node(id: $id) {
+        __typename
+        ... on Discussion {
+          ...DiscussionForComments
+        }
+      }
+    }
+
+    fragment DiscussionForComments on Discussion {
+      id
+      number
+      title
+      url
+      comments(first: 100, after: $after) {
+        totalCount
+        nodes {
+          id
+          url
+          createdAt
+          updatedAt
+          isAnswer
+          replyTo { id }
+          author { login }
+          body
+          replies(first: 100) {
+            nodes {
+              id
+              url
+              createdAt
+              updatedAt
+              replyTo { id }
+              author { login }
+              body
             }
           }
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
         }
       }
     }
@@ -556,14 +646,26 @@ async function handleListComments(options, token) {
   let discussionSummary = null;
 
   while (hasNextPage) {
-    const data = await requestGraphQL(token, query, {
-      owner: options.owner,
-      name: options.repo,
-      number: options.number,
-      after,
-    });
+    const variables = { after };
+    let query;
+    if (options.discussionId) {
+      query = queryById;
+      variables.id = options.discussionId;
+    } else {
+      query = queryByNumber;
+      variables.owner = options.owner;
+      variables.name = options.repo;
+      variables.number = options.number;
+    }
 
-    const discussion = data?.repository?.discussion;
+    const data = await requestGraphQL(token, query, variables);
+
+    const discussion = options.discussionId
+      ? data?.node && data.node.__typename === 'Discussion'
+        ? data.node
+        : null
+      : data?.repository?.discussion;
+
     if (!discussion) {
       throw new Error('Discussion not found.');
     }
@@ -574,10 +676,14 @@ async function handleListComments(options, token) {
         number: discussion.number,
         title: discussion.title,
         url: discussion.url,
+        commentCount: discussion.comments?.totalCount ?? null,
       };
     }
 
-    const batch = discussion.comments?.nodes ?? [];
+    const batch = (discussion.comments?.nodes ?? []).map((comment) => ({
+      ...comment,
+      replies: comment.replies?.nodes ?? [],
+    }));
     comments.push(...batch);
 
     if (Number.isFinite(options.limit) && options.limit > 0 && comments.length >= options.limit) {

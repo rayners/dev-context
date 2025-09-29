@@ -80,51 +80,138 @@ disc-category-discussions: |
 disc-comments: |
   !f() {
     if [ $# -lt 3 ]; then
-      echo "Usage: gh disc-comments <owner> <repo> <discussionNumber>" >&2
-      return 1
-    fi
-
-    gh api graphql \
-      -f owner="$1" \
-      -f name="$2" \
-      -F number=$3 \
-      -f query='query($owner: String!, $name: String!, $number: Int!) {
-        repository(owner: $owner, name: $name) {
-          discussion(number: $number) {
-            id
-            title
-            url
-            comments(first: 100) {
-              nodes {
-                id
-                url
-                createdAt
-                updatedAt
-                replyTo {
-                  id
-                }
-                author {
-                  login
-                }
-                body
-              }
-            }
-          }
-        }
-      }' \
-      --jq '.data.repository.discussion.comments.nodes'
-  }; f "$@"
-
-disc-reply: |
-  !f() {
-    if [ $# -lt 4 ]; then
-      echo "Usage: gh disc-reply <owner> <repo> <discussionNumber> <replyToCommentId> <body>" >&2
+      echo "Usage: gh disc-comments <owner> <repo> <discussionNumber|discussionId>" >&2
       return 1
     fi
 
     owner="$1"
     repo="$2"
-    number="$3"
+    ref="$3"
+
+    jq_filter=$(cat <<'JQ'
+def norm($c):
+  $c + {replies: ($c.replies.nodes // [])}
+  | del(.replies);
+def build($d):
+  {
+    discussion: {
+      id: $d.id,
+      number: $d.number,
+      title: $d.title,
+      url: $d.url,
+      commentCount: $d.comments.totalCount
+    },
+    comments: ($d.comments.nodes // [] | map(norm(.)))
+  };
+if .data.repository?.discussion then
+  build(.data.repository.discussion)
+elif (.data.node // {} | .__typename == "Discussion") then
+  build(.data.node)
+else
+  {discussion: null, comments: []}
+end
+JQ
+)
+
+    case "$ref" in
+      ('')
+        echo "Discussion reference may not be empty" >&2
+        return 1
+        ;;
+      (*[!0-9]*)
+        gh api graphql \
+          -f id="$ref" \
+          -f query='query($id: ID!) {
+            node(id: $id) {
+              __typename
+              ... on Discussion {
+                id
+                number
+                title
+                url
+                comments(first: 100) {
+                  totalCount
+                  nodes {
+                    id
+                    url
+                    createdAt
+                    updatedAt
+                    isAnswer
+                    replyTo { id }
+                    author { login }
+                    body
+                    replies(first: 100) {
+                      nodes {
+                        id
+                        url
+                        createdAt
+                        updatedAt
+                        replyTo { id }
+                        author { login }
+                        body
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }' \
+          --jq "$jq_filter"
+        ;;
+      (*)
+        gh api graphql \
+          -f owner="$owner" \
+          -f name="$repo" \
+          -F number=$ref \
+          -f query='query($owner: String!, $name: String!, $number: Int!) {
+            repository(owner: $owner, name: $name) {
+              discussion(number: $number) {
+                id
+                number
+                title
+                url
+                comments(first: 100) {
+                  totalCount
+                  nodes {
+                    id
+                    url
+                    createdAt
+                    updatedAt
+                    isAnswer
+                    replyTo { id }
+                    author { login }
+                    body
+                    replies(first: 100) {
+                      nodes {
+                        id
+                        url
+                        createdAt
+                        updatedAt
+                        replyTo { id }
+                        author { login }
+                        body
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }' \
+          --jq "$jq_filter"
+        ;;
+    esac
+  }; f "$@"
+
+disc-reply: |
+  !f() {
+    if [ $# -lt 4 ]; then
+      echo "Usage: gh disc-reply <owner> <repo> <discussionNumber|discussionId> <replyToCommentId> <body>" >&2
+      return 1
+    fi
+
+    owner="$1"
+    repo="$2"
+    discussion_ref="$3"
     reply_to="$4"
     shift 4
 
@@ -134,13 +221,20 @@ disc-reply: |
       return 1
     fi
 
-    discussion_id=$(gh api graphql -f owner="$owner" -f name="$repo" -F number=$number -f query='query($owner: String!, $name: String!, $number: Int!) {
-      repository(owner: $owner, name: $name) {
-        discussion(number: $number) {
-          id
-        }
-      }
-    }' --jq '.data.repository.discussion.id')
+    case "$discussion_ref" in
+      (*[!0-9]*)
+        discussion_id="$discussion_ref"
+        ;;
+      (*)
+        discussion_id=$(gh api graphql -f owner="$owner" -f name="$repo" -F number=$discussion_ref -f query='query($owner: String!, $name: String!, $number: Int!) {
+          repository(owner: $owner, name: $name) {
+            discussion(number: $number) {
+              id
+            }
+          }
+        }' --jq '.data.repository.discussion.id')
+        ;;
+    esac
 
     if [ -z "$discussion_id" ] || [ "$discussion_id" = "null" ]; then
       echo "Unable to resolve discussion id" >&2
