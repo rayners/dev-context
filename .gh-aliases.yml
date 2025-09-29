@@ -1,0 +1,133 @@
+aliases:
+  disc-categories: |
+    !owner="$1"; repo="$2"; if [ -z "$owner" ] || [ -z "$repo" ]; then echo "Usage: gh disc-categories <owner> <repo>" >&2; exit 1; fi
+    query=$(cat <<'GRAPHQL'
+    query($owner: String!, $name: String!) {
+      repository(owner: $owner, name: $name) {
+        discussionCategories(first: 100) {
+          nodes {
+            id
+            name
+            description
+            isAnswerable
+          }
+        }
+      }
+    }
+    GRAPHQL
+    )
+    gh api graphql -F owner="$owner" -F name="$repo" -f query="$query" --jq '.data.repository.discussionCategories.nodes'
+  disc-category-discussions: |
+    !owner="$1"; repo="$2"; category="$3"; answered_arg="$4"
+    if [ -z "$owner" ] || [ -z "$repo" ] || [ -z "$category" ]; then
+      echo "Usage: gh disc-category-discussions <owner> <repo> <categoryId> [answered|unanswered|true|false|any]" >&2
+      exit 1
+    fi
+    query=$(cat <<'GRAPHQL'
+    query($owner: String!, $name: String!, $categoryId: ID!, $answered: Boolean) {
+      repository(owner: $owner, name: $name) {
+        discussions(
+          first: 50,
+          orderBy: { field: CREATED_AT, direction: DESC },
+          categoryId: $categoryId,
+          answered: $answered
+        ) {
+          nodes {
+            id
+            number
+            title
+            url
+            state
+            answerChosenAt
+            createdAt
+          }
+        }
+      }
+    }
+    GRAPHQL
+    )
+    cmd=(api graphql -F owner="$owner" -F name="$repo" -F categoryId="$category" -f query="$query")
+    case "$answered_arg" in
+      answered|true)
+        cmd+=(-F answered=true)
+        ;;
+      unanswered|false)
+        cmd+=(-F answered=false)
+        ;;
+      ""|any)
+        ;;
+      *)
+        echo "Optional answered argument must be answered, unanswered, true, false, or any" >&2
+        exit 1
+        ;;
+    esac
+    gh "${cmd[@]}" --jq '.data.repository.discussions.nodes'
+  disc-comments: |
+    !owner="$1"; repo="$2"; number="$3"
+    if [ -z "$owner" ] || [ -z "$repo" ] || [ -z "$number" ]; then
+      echo "Usage: gh disc-comments <owner> <repo> <discussionNumber>" >&2
+      exit 1
+    fi
+    query=$(cat <<'GRAPHQL'
+    query($owner: String!, $name: String!, $number: Int!) {
+      repository(owner: $owner, name: $name) {
+        discussion(number: $number) {
+          id
+          title
+          url
+          comments(first: 100) {
+            nodes {
+              id
+              url
+              createdAt
+              updatedAt
+              replyTo { id }
+              author { login }
+              body
+            }
+          }
+        }
+      }
+    }
+    GRAPHQL
+    )
+    gh api graphql -F owner="$owner" -F name="$repo" -F number="$number" -f query="$query" --jq '.data.repository.discussion.comments.nodes'
+  disc-reply: |
+    !owner="$1"; repo="$2"; number="$3"; reply_to="$4"; shift 4; body="$*"
+    if [ -z "$owner" ] || [ -z "$repo" ] || [ -z "$number" ] || [ -z "$reply_to" ]; then
+      echo "Usage: gh disc-reply <owner> <repo> <discussionNumber> <replyToCommentId> <body>" >&2
+      exit 1
+    fi
+    if [ -z "$body" ]; then
+      echo "Reply body must be provided as the remaining arguments." >&2
+      exit 1
+    fi
+    lookup=$(cat <<'GRAPHQL'
+    query($owner: String!, $name: String!, $number: Int!) {
+      repository(owner: $owner, name: $name) {
+        discussion(number: $number) {
+          id
+        }
+      }
+    }
+    GRAPHQL
+    )
+    discussion_id=$(gh api graphql -F owner="$owner" -F name="$repo" -F number="$number" -f query="$lookup" --jq '.data.repository.discussion.id')
+    if [ -z "$discussion_id" ] || [ "$discussion_id" = "null" ]; then
+      echo "Unable to resolve discussion id" >&2
+      exit 1
+    fi
+    mutation=$(cat <<'GRAPHQL'
+    mutation($discussionId: ID!, $replyToId: ID!, $body: String!) {
+      addDiscussionComment(input: { discussionId: $discussionId, replyToId: $replyToId, body: $body }) {
+        comment {
+          id
+          url
+          createdAt
+          body
+        }
+      }
+    }
+    GRAPHQL
+    )
+    gh api graphql -F discussionId="$discussion_id" -F replyToId="$reply_to" -F body="$body" -f query="$mutation" --jq '.data.addDiscussionComment.comment'
