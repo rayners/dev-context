@@ -88,30 +88,7 @@ disc-comments: |
     repo="$2"
     ref="$3"
 
-    jq_filter=$(cat <<'JQ'
-def norm($c):
-  $c + {replies: ($c.replies.nodes // [])}
-  | del(.replies);
-def build($d):
-  {
-    discussion: {
-      id: $d.id,
-      number: $d.number,
-      title: $d.title,
-      url: $d.url,
-      commentCount: $d.comments.totalCount
-    },
-    comments: ($d.comments.nodes // [] | map(norm(.)))
-  };
-if .data.repository?.discussion then
-  build(.data.repository.discussion)
-elif (.data.node // {} | .__typename == "Discussion") then
-  build(.data.node)
-else
-  {discussion: null, comments: []}
-end
-JQ
-)
+    jq_filter=$'def norm($c):\n  $c + {replies: ($c.replies.nodes // [])}\n  | del(.replies);\ndef build($d):\n  {\n    discussion: {\n      id: $d.id,\n      number: $d.number,\n      title: $d.title,\n      url: $d.url,\n      commentCount: $d.comments.totalCount\n    },\n    comments: ($d.comments.nodes // [] | map(norm(.)))\n  };\nif .data.repository?.discussion then\n  build(.data.repository.discussion)\nelif (.data.node // {} | .__typename == "Discussion") then\n  build(.data.node)\nelse\n  {discussion: null, comments: []}\nend'
 
     case "$ref" in
       ('')
