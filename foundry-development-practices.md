@@ -163,6 +163,49 @@ TZ=America/New_York date "+%Y-%m-%d %H:%M:%S %Z"   # Full timestamp with EDT/EST
 
 ## Foundry-Specific Patterns
 
+### Module Loading Order (CRITICAL UNDERSTANDING)
+
+**⚠️ ABSOLUTE TRUTH: Module relationships in module.json DO NOT control loading order**
+
+#### What Relationships Actually Do
+- **Installation Only**: Prompt users to install required/recommended modules
+- **UI Warnings**: Show compatibility warnings in module management
+- **Metadata Only**: Provide information to users and package managers
+
+#### What Relationships DO NOT Do
+- **❌ DO NOT control which module loads first**
+- **❌ DO NOT guarantee load order between modules**
+- **❌ DO NOT make one module wait for another to initialize**
+- **❌ DO NOT affect ESModule script loading sequence**
+
+#### Module Loading Reality
+- **ESModule files load asynchronously** with unpredictable order
+- **Parse-time code executes** when browser parses each file independently
+- **No mechanism exists** to control cross-module loading order in Foundry
+- **Hook execution order** (init → setup → ready) is consistent, but which module's hooks fire first within each phase is unpredictable
+
+#### Architectural Implications
+When building compatibility bridges or module integrations:
+
+1. **Cannot rely on load order**: Your module may load before OR after other modules
+2. **Parse-time availability**: If you expose globals at parse time, other modules may or may not see them depending on load order
+3. **Hook-based solutions**: Use hooks (especially `init`) to register as early as possible, but understand other modules' parse-time code has already run
+4. **Defensive programming**: Assume worst-case timing for all integrations
+
+#### Common Mistake
+```javascript
+// ❌ WRONG: Assuming relationships guarantee this module loads after dependency
+import { SomeAPI } from 'other-module';  // May not exist yet!
+
+// ✅ CORRECT: Check availability and handle missing dependencies
+Hooks.once('init', () => {
+  const otherModule = game.modules.get('other-module');
+  if (otherModule?.active) {
+    // Safe to integrate
+  }
+});
+```
+
 ### Common Implementation Patterns
 - **Module Registration**: Standard module.json and main entry point
 - **Localization**: Full i18n support with English base language
