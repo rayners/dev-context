@@ -426,6 +426,22 @@ export default defineConfig({
 
 ## Release Management
 
+### Module Distribution Model
+
+FoundryVTT modules are **distributed software packages** installed by users into their own Foundry instances:
+
+- **Downloadable Artifacts**: Users download module.zip files from GitHub releases
+- **Local Installation**: Each user installs into their own Foundry VTT instance
+- **No Central Deployment**: There is no singular "production" environment you control
+- **User-Managed Updates**: Users must manually update to newer versions
+- **Persistence**: Released versions remain available; you cannot force rollbacks
+
+**Automation Implications**:
+- Release artifacts must be complete and self-contained
+- Automated testing must catch issues before release publication
+- CI/CD pipelines must validate thoroughly since post-release fixes require user action
+- Asset packaging must include all necessary files for standalone operation
+
 ### Semantic Versioning
 - **v0.x.x**: Development releases, breaking changes allowed
 - **v1.x.x**: Stable API, only backward-compatible changes

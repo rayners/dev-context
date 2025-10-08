@@ -96,6 +96,22 @@ TZ=America/New_York date "+%Y-%m-%d %H:%M:%S %Z"   # Full timestamp with EDT/EST
 
 ## Release Process
 
+### Understanding Module Distribution
+
+FoundryVTT modules are **downloadable software packages** that users install into their own Foundry instances. This distributed deployment model has critical implications:
+
+- **No Singular Production Environment**: Unlike web applications, there is no central "production" deployment that you control
+- **User-Controlled Installation**: Each user downloads and installs your module into their own Foundry VTT instance
+- **Version Diversity**: Different users may run different versions of your module simultaneously
+- **Limited Rollback**: Once users download a version, you cannot force updates or rollbacks
+- **Testing Implications**: You cannot monitor production behavior in real-time; testing must be comprehensive before release
+
+**Release Strategy Consequences**:
+- Releases must be thoroughly tested before publication
+- Breaking changes require clear migration documentation
+- Bug fixes require new releases and user action to install
+- Compatibility must be maintained across Foundry versions users may be running
+
 ### Version Management
 1. **Test Validation**: All unit and integration tests must pass
 2. **Build Verification**: Successful `npm run build` required
