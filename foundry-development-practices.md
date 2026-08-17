@@ -2,23 +2,9 @@
 
 *Compiled from CLAUDE.md files and local-docs for Foundry module development*
 
-## 🚨 CRITICAL SECURITY RESTRICTION 🚨
+## 🚨 AI Code Access Policy 🚨
 
-**FOUNDRY VTT APPLICATION CODE ACCESS IS STRICTLY FORBIDDEN**
-
-**❌ NEVER ACCESS, READ, OR ANALYZE:**
-- FoundryVTT application source code (any file from FoundryVTT installation)
-- FoundryVTT core system files or proprietary implementation
-- Any code within the FoundryVTT application directory
-- Internal FoundryVTT modules or core functionality source
-
-**✅ ONLY USE THESE APPROVED SOURCES:**
-- Official FoundryVTT API documentation (documentation only)
-- Community-maintained type definitions (npm packages)
-- Open-source user-created module code
-- Published developer guides and tutorials
-
-**This restriction protects legal compliance, respects intellectual property, and maintains security.**
+See **[AI Code Access Restrictions](ai-code-access-restrictions.md)** for the current policy on referencing FoundryVTT's client-side source code. In short: FoundryVTT's AI Content Policy permits AI tools to reference client-side source as context for FoundryVTT package-development work specifically — it is not permitted for other purposes, and FoundryVTT source must never be redistributed or copied into shipped module code.
 
 ## Development Workflow Standards
 

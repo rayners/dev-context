@@ -15,16 +15,39 @@ The repository contains standardized patterns and practices used across multiple
 - **module-architecture-patterns.md** - Universal module structure, provider patterns, and clean architecture principles
 - **automation-infrastructure.md** - Professional CI/CD workflows, GitHub Actions, and release management
 - **documentation-standards.md** - Documentation organization, quality standards, and maintenance practices
-- **ai-code-access-restrictions.md** - Security restrictions for AI code access (READ FIRST)
+- **ai-code-access-restrictions.md** - Policy on AI access to FoundryVTT client-side code (READ FIRST)
 - **external-documentation-references.md** - Official FoundryVTT docs and approved community resources
+
+### Shared CI/CD Automation Assets
+
+- **claude-prompts/** - Shared prompt templates consumed by GitHub Actions workflows in FoundryVTT modules:
+  - `pr-review.md` - Automated PR code review (used by `claude-code-review.yml`)
+  - `bug-triage.md` - Automated bug triage on new issues (used by `claude-issue-triage.yml`)
+  - `qa-discussion.md` - Automated Q&A responses in GitHub Discussions (used by `claude-qa-discussions.yml`)
+  - `development-task.md` - @claude-triggered development tasks (used by `claude-development.yml`)
+- **.gh-aliases.yml** - GitHub CLI aliases for Discussions management (`disc-categories`, `disc-category-discussions`, `disc-comments`, `disc-reply`), imported by workflows at runtime
+- **scripts/discussions.js** - Standalone Node.js CLI for GitHub Discussions management
+
+## How This Repo Is Consumed
+
+Consuming modules (e.g., `fvtt-seasons-and-stars`) check out this repo in their GitHub Actions workflows:
+
+```yaml
+- uses: actions/checkout@v6
+  with:
+    repository: rayners/dev-context
+    path: dev-context
+```
+
+Workflows then load prompt templates with `cat dev-context/claude-prompts/<prompt>.md` and pass them to `anthropics/claude-code-action`. The `.gh-aliases.yml` file is imported via `gh alias import dev-context/.gh-aliases.yml`.
+
+This repo has no `package.json` — it is a pure reference/documentation repository with no build or test commands of its own.
 
 ## Document Purpose and Usage
 
-### For AI Assistants Working on FoundryVTT Development
+**CRITICAL FIRST STEP**: Always read `ai-code-access-restrictions.md` first — it defines the current policy on referencing FoundryVTT's client-side application code (conditionally permitted as AI context for package-development work, per FoundryVTT's AI Content Policy; not permitted for any other purpose).
 
-**CRITICAL FIRST STEP**: Always read `ai-code-access-restrictions.md` first to understand strict security boundaries around FoundryVTT proprietary code.
-
-**Reference Strategy**: Use selective reference - only load the specific documents needed for each task to minimize context usage while ensuring access to relevant standards.
+**Reference Strategy**: Use selective reference - only load the specific documents needed for each task to minimize context usage.
 
 **Typical Usage Patterns**:
 - Development workflow questions → `foundry-development-practices.md`
@@ -32,16 +55,7 @@ The repository contains standardized patterns and practices used across multiple
 - Architecture decisions → `module-architecture-patterns.md`
 - Documentation work → `documentation-standards.md`
 - CI/CD setup → `automation-infrastructure.md`
-
-### Quality Standards Applied
-
-These documents enforce consistent standards across all FoundryVTT module development:
-
-- **Documentation Accuracy**: All claims must be verifiable in code
-- **No Hyperbole**: Avoid "works with all systems", "fully tested", "production ready"
-- **TDD Workflow**: Tests first, then implementation for new features
-- **90%+ Coverage**: Required for core business logic
-- **System-Agnostic Design**: Graceful degradation across game systems
+- Prompt template editing → `claude-prompts/`
 
 ## Development Context Integration
 
@@ -60,32 +74,16 @@ Specific areas:
 - Architecture patterns: [dev-context/module-architecture-patterns.md](dev-context/module-architecture-patterns.md)
 ```
 
-### Automation Standards
+### Consuming Module Commands (not this repo)
 
-When working with FoundryVTT modules that reference this context:
+FoundryVTT modules that reference this context use these commands:
 
-**Standard Commands**:
 - `npm run validate` - Complete quality pipeline (lint + format:check + typecheck + test + build)
 - `npm run test:run` - Execute full test suite (NEVER use `npm run test:workspaces`)
 - `npm run build` - Production build with TypeScript compilation
 
-**CI/CD Requirements**:
-- Multi-node testing (Node 18, 20)
-- GitHub packages authentication for @rayners dependencies
-- Conventional commits for automated changelog
-- Comprehensive quality gates before releases
+## Notes
 
-## File Organization Context
-
-This repository serves as the central reference for:
-- **Consistent Standards**: Uniform patterns across all FoundryVTT modules
-- **Quality Assurance**: Professional-grade development practices
-- **Architecture Guidance**: Proven patterns for system compatibility
-- **Automation Templates**: Ready-to-use CI/CD workflows
-
-## Maintenance Notes
-
+- AGENTS.md is a symlink to this CLAUDE.md
 - Context derived from CLAUDE.md files across multiple FoundryVTT modules
-- Based on real-world development experience and lessons learned
-- Designed to be comprehensive, authoritative, accessible, and secure
-- Last updated: 2025-09-17 based on current development standards
+- Last updated: 2026-08-16
