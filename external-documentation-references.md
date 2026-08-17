@@ -2,41 +2,11 @@
 
 *Key external resources for FoundryVTT module development*
 
-## 🚨 CRITICAL SECURITY RESTRICTION 🚨
+## 🚨 AI Code Access Policy 🚨
 
-**FOUNDRY VTT APPLICATION CODE ACCESS IS STRICTLY FORBIDDEN**
+See **[AI Code Access Restrictions](ai-code-access-restrictions.md)** for the full, current policy on AI access to FoundryVTT's client-side source code. In short: referencing it as AI context is permitted for FoundryVTT package-development purposes per FoundryVTT's AI Content Policy, but not for other purposes, and never for redistribution.
 
-### AI/Assistant Code Access Policy
-
-**❌ NEVER ACCESS OR READ:**
-- FoundryVTT application source code (any file from the FoundryVTT installation)
-- FoundryVTT core system files
-- FoundryVTT proprietary implementation details
-- Any code within the FoundryVTT application directory
-- Internal FoundryVTT modules or core functionality source code
-
-**✅ ONLY ACCESS THESE APPROVED SOURCES:**
-- **Official FoundryVTT API Documentation**: https://foundryvtt.com/api/ (documentation only)
-- **Published FoundryVTT developer guides** (documentation only)
-- **Community-maintained type definitions** (npm packages, GitHub repositories)
-- **Open-source module code** (user-created modules only)
-- **Community documentation and tutorials**
-
-### Why This Restriction Exists
-- **Legal Protection**: FoundryVTT application code is proprietary and copyrighted
-- **License Compliance**: Accessing proprietary code could violate software licenses
-- **Security**: Prevents exposure of internal implementation details
-- **Ethics**: Respects intellectual property rights of FoundryVTT developers
-
-### How to Get FoundryVTT Information
-**Instead of reading FoundryVTT code:**
-1. **Use Official API Documentation**: https://foundryvtt.com/api/
-2. **Read Published Guides**: https://foundryvtt.com/article/module-development/
-3. **Use Community Type Definitions**: `@league-of-foundry-developers/foundry-vtt-types`
-4. **Reference Community Modules**: Open-source module implementations
-5. **Ask Specific Questions**: Request clarification on API usage patterns
-
-**This restriction applies to ALL AI assistants and automated tools working on FoundryVTT-related projects.**
+**This applies to ALL AI assistants and automated tools working on FoundryVTT-related projects.**
 
 ## FoundryVTT Core Documentation
 
@@ -45,6 +15,7 @@
 - **Module Development Guide**: https://foundryvtt.com/article/module-development/
 - **Package Development**: https://foundryvtt.com/article/package-development/
 - **Localization Guide**: https://foundryvtt.com/article/localization/
+- **AI Content Policy**: https://foundryvtt.com/article/ai-policy/ - Governs AI-generated content and AI access to client-side source code (see [ai-code-access-restrictions.md](ai-code-access-restrictions.md))
 
 ### Community Resources
 - **FoundryVTT Hub**: https://www.foundryvtt-hub.com/

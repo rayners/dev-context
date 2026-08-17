@@ -2,11 +2,11 @@
 
 *Comprehensive development reference materials for FoundryVTT module development*
 
-## 🚨 CRITICAL SECURITY NOTICE
+## 🚨 AI CODE ACCESS POLICY
 
 **READ FIRST:** [AI Code Access Restrictions](ai-code-access-restrictions.md)
 
-This document establishes the absolute prohibition on AI/Assistant access to FoundryVTT proprietary application code while clarifying that open-source community modules are acceptable when properly licensed.
+This document establishes the current policy on AI/Assistant access to FoundryVTT's client-side application code: referencing it as AI context is permitted for FoundryVTT package-development purposes per FoundryVTT's official AI Content Policy, but not for other purposes or redistribution. It also clarifies that open-source community modules are acceptable to read when properly licensed.
 
 ## Table of Contents
 
